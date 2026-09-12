@@ -1,0 +1,112 @@
+:root {
+  --text: #374151;
+  --text-h: #0f172a;
+  --bg: #f6f8fb;
+  --border: #d7dde8;
+  --code-bg: #eef2ff;
+  --accent: #f0ad4e;
+  --accent-bg: rgba(240, 173, 78, 0.12);
+  --accent-border: rgba(240, 173, 78, 0.55);
+  --social-bg: rgba(255, 255, 255, 0.72);
+  --shadow:
+    rgba(15, 23, 42, 0.08) 0 10px 15px -3px,
+    rgba(15, 23, 42, 0.04) 0 4px 6px -2px;
+
+  --sans:
+    "Segoe UI", Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --heading:
+    "Segoe UI", Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+
+  font: 16px/1.5 var(--sans);
+  letter-spacing: 0.01em;
+  color-scheme: light;
+  color: var(--text);
+  background: linear-gradient(180deg, #fbfcfe 0%, #f4f7fb 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#root {
+  min-height: 100svh;
+}
+
+h1,
+h2 {
+  font-family: var(--heading);
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+h1 {
+  font-size: clamp(2rem, 3vw, 3.25rem);
+  letter-spacing: -0.04em;
+}
+
+h2 {
+  font-size: clamp(1.125rem, 2vw, 1.5rem);
+  letter-spacing: -0.02em;
+}
+
+p {
+  margin-bottom: 0;
+}
+
+code,
+.counter {
+  font-family: var(--mono);
+  display: inline-flex;
+  border-radius: 4px;
+  color: var(--text-h);
+}
+
+code {
+  font-size: 0.9375rem;
+  padding: 4px 8px;
+  background: var(--code-bg);
+}
+
+a {
+  color: inherit;
+}
+
+.btn {
+  border-radius: 0.85rem;
+}
+
+.card {
+  border-radius: 1rem;
+}
+
+.form-check-input:checked {
+  background-color: #f0ad4e;
+  border-color: #f0ad4e;
+}
+
+.nav-pills .nav-link.active {
+  background-color: #0f172a;
+}
+
+.accordion-button:not(.collapsed) {
+  color: #0f172a;
+  background-color: #fff8ea;
+}
+
+.table thead th {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.text-accent {
+  color: #d98a10;
+}
