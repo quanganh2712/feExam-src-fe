@@ -11,7 +11,18 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
+const missingConfig = ["apiKey", "authDomain", "projectId", "appId"].filter(
+  (key) => !firebaseConfig[key],
+);
+
+if (missingConfig.length) {
+  throw new Error(
+    `Missing Firebase configuration: ${missingConfig.join(", ")}`,
+  );
+}
+
 const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 export const firebaseAuth = getAuth(firebaseApp);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: "select_account" });

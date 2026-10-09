@@ -200,12 +200,29 @@ function AuthPage() {
         navigate("/", { replace: true });
       }
     } catch (error) {
-      setMessage(
-        error?.response?.data?.message ||
-          (error?.code === "auth/popup-closed-by-user"
-            ? "Cửa sổ đăng nhập đã được đóng."
-            : "Không thể đăng nhập bằng Google."),
-      );
+      const firebaseMessages = {
+        "auth/popup-closed-by-user": "Cửa sổ đăng nhập đã được đóng.",
+        "auth/popup-blocked":
+          "Trình duyệt đã chặn cửa sổ Google. Hãy cho phép popup rồi thử lại.",
+        "auth/cancelled-popup-request":
+          "Một yêu cầu đăng nhập Google khác đang được xử lý.",
+        "auth/unauthorized-domain": `Domain ${window.location.hostname} chưa được thêm vào Firebase Authorized domains.`,
+        "auth/operation-not-allowed":
+          "Google Sign-In chưa được bật trong Firebase Authentication.",
+        "auth/invalid-api-key":
+          "Firebase API key trên bản deploy không hợp lệ hoặc bị thiếu.",
+        "auth/network-request-failed":
+          "Không thể kết nối tới Firebase. Hãy kiểm tra mạng và cấu hình domain.",
+      };
+      const apiMessage = error?.response?.data?.message;
+      const message =
+        apiMessage ||
+        firebaseMessages[error?.code] ||
+        (error?.request && !error?.response
+          ? "Không thể kết nối tới máy chủ đăng nhập. Kiểm tra VITE_API_URL trên Vercel."
+          : error?.message || "Không thể đăng nhập bằng Google.");
+
+      setMessage(message);
     } finally {
       setIsSubmitting(false);
     }
