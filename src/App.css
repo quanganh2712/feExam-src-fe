@@ -213,8 +213,10 @@
 }
 
 .auth-google-button:hover:not(:disabled) {
-  border-color: #0f172a;
-  background: #f8fafc;
+  border-color: #d7dde8;
+  background: #fff;
+  color: inherit;
+  box-shadow: none;
 }
 
 .google-mark {

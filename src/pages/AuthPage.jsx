@@ -99,8 +99,8 @@ function AuthPage() {
           localStorage.setItem("authToken", data.token);
           navigate("/", { replace: true });
         }
-      } catch (error) {
-        console.error("Google redirect login failed", error);
+      } catch {
+        return;
       } finally {
         if (isMounted) setIsSubmitting(false);
       }
@@ -222,8 +222,7 @@ function AuthPage() {
     try {
       setIsSubmitting(true);
       await signInWithRedirect(firebaseAuth, googleProvider);
-    } catch (error) {
-      console.error("Could not start Google redirect login", error);
+    } catch {
       setIsSubmitting(false);
     }
   };
