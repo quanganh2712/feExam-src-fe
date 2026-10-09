@@ -193,8 +193,22 @@ function AuthPage() {
       navigate("/", { replace: true });
     } catch (error) {
       console.error("Google login failed", error);
+      const firebaseMessages = {
+        "auth/unauthorized-domain":
+          "Domain hiện tại chưa được thêm vào Firebase Authorized domains.",
+        "auth/popup-blocked":
+          "Trình duyệt đã chặn popup. Hãy cho phép popup cho trang này.",
+        "auth/popup-closed-by-user":
+          "Cửa sổ Google đã bị đóng trước khi đăng nhập hoàn tất.",
+        "auth/operation-not-allowed":
+          "Google provider chưa được bật trong Firebase Authentication.",
+        "auth/cancelled-popup-request":
+          "Đang có một yêu cầu đăng nhập Google khác đang mở.",
+      };
       setMessage(
         error?.response?.data?.message ||
+          firebaseMessages[error?.code] ||
+          (error?.code ? `Google login lỗi: ${error.code}` : null) ||
           "Đăng nhập Google thất bại. Vui lòng thử lại.",
       );
     } finally {
