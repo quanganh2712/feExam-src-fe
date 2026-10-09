@@ -13,29 +13,9 @@ import AuthPage from "../pages/AuthPage";
 
 function RequireAuth({ children }) {
   const token = localStorage.getItem("authToken");
-  let hasValidToken = Boolean(token);
-  let requiresPasswordSetup = false;
+  const hasValidToken = Boolean(token);
 
-  if (token) {
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      requiresPasswordSetup = payload.requiresPasswordSetup === true;
-    } catch {
-      localStorage.removeItem("authToken");
-      hasValidToken = false;
-    }
-  }
-
-  if (requiresPasswordSetup) {
-    localStorage.setItem("setupToken", token);
-    localStorage.removeItem("authToken");
-  }
-
-  return hasValidToken && !requiresPasswordSetup ? (
-    children
-  ) : (
-    <Navigate to="/login" replace />
-  );
+  return hasValidToken ? children : <Navigate to="/login" replace />;
 }
 
 function AppRoutes() {

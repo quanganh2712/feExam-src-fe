@@ -31,7 +31,6 @@ function WrongAnswersPage() {
   const [wrongAnswers, setWrongAnswers] = useState([]);
   const [answers, setAnswers] = useState({});
   const [checkedAnswers, setCheckedAnswers] = useState({});
-  const [checkingQuestionId, setCheckingQuestionId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -99,7 +98,6 @@ function WrongAnswersPage() {
     }));
 
     try {
-      setCheckingQuestionId(questionKey);
       if (selectedAnswer !== correctAnswer) return;
 
       await examsApi.removeWrongAnswer(questionKey);
@@ -121,8 +119,6 @@ function WrongAnswersPage() {
         err?.response?.data?.message ||
           "Không thể xóa câu hỏi đã trả lời đúng.",
       );
-    } finally {
-      setCheckingQuestionId(null);
     }
   };
 
@@ -163,15 +159,10 @@ function WrongAnswersPage() {
                       onSelectOption={(optionId) =>
                         handleSelectAnswer(question, optionId)
                       }
-                      showAnswerKey={isChecked}
+                      showAnswerKey={false}
                       showWrongAnswer={isChecked}
                       showQuestionNumber={false}
                     />
-                    {isChecked && checkingQuestionId !== questionKey ? (
-                      <div className="text-secondary small mt-3">
-                        Đáp án đúng đã được đánh dấu.
-                      </div>
-                    ) : null}
                   </div>
                 </div>
               );

@@ -13,7 +13,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import authApi from "../services/authApi";
 import { firebaseAuth, googleProvider } from "../services/firebase";
-import { getRedirectResult, signInWithRedirect } from "firebase/auth";
+import { signInWithPopup } from "firebase/auth";
 
 function RegistrationHint({ id, children }) {
   return (
@@ -56,7 +56,6 @@ function AuthPage() {
   });
   const [fieldErrors, setFieldErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const isRegister = mode === "register";
   const isForgotPassword = mode === "forgot";
   const isResetPassword = mode === "reset";
@@ -69,48 +68,6 @@ function AuthPage() {
       window.history.replaceState({}, document.title, window.location.pathname);
       navigate("/", { replace: true });
     }
-  }, [navigate]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function completeGoogleLogin() {
-      try {
-        const result = await getRedirectResult(firebaseAuth);
-
-        if (!result || !isMounted) return;
-
-        setIsSubmitting(true);
-        const idToken = await result.user.getIdToken(true);
-        const response = await authApi.loginWithGoogle(idToken);
-        const data = response?.data?.data ?? response?.data;
-
-        if (data.requiresPasswordSetup) {
-          localStorage.removeItem("authToken");
-          localStorage.setItem("setupToken", data.token);
-          setForm((previous) => ({
-            ...previous,
-            email: data.user?.email || result.user.email || "",
-          }));
-          setMode("setup-password");
-          setMessage("");
-        } else {
-          localStorage.removeItem("setupToken");
-          localStorage.setItem("authToken", data.token);
-          navigate("/", { replace: true });
-        }
-      } catch {
-        return;
-      } finally {
-        if (isMounted) setIsSubmitting(false);
-      }
-    }
-
-    completeGoogleLogin();
-
-    return () => {
-      isMounted = false;
-    };
   }, [navigate]);
 
   const updateField = (event) => {
@@ -221,8 +178,26 @@ function AuthPage() {
   const handleGoogleLogin = async () => {
     try {
       setIsSubmitting(true);
-      await signInWithRedirect(firebaseAuth, googleProvider);
-    } catch {
+      const result = await signInWithPopup(firebaseAuth, googleProvider);
+      const idToken = await result.user.getIdToken(true);
+      const response = await authApi.loginWithGoogle(idToken);
+      const data = response?.data?.data ?? response?.data;
+      const token = data?.token || data?.accessToken || data?.access_token;
+
+      if (!token) {
+        throw new Error("Google login response did not include a token");
+      }
+
+      localStorage.removeItem("setupToken");
+      localStorage.setItem("authToken", token);
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error("Google login failed", error);
+      setMessage(
+        error?.response?.data?.message ||
+          "Đăng nhập Google thất bại. Vui lòng thử lại.",
+      );
+    } finally {
       setIsSubmitting(false);
     }
   };
