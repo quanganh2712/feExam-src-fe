@@ -13,7 +13,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import authApi from "../services/authApi";
 import { firebaseAuth, googleProvider } from "../services/firebase";
-import { signInWithPopup } from "firebase/auth";
+import { getRedirectResult, signInWithRedirect } from "firebase/auth";
 
 function RegistrationHint({ id, children }) {
   return (
@@ -69,6 +69,48 @@ function AuthPage() {
       window.history.replaceState({}, document.title, window.location.pathname);
       navigate("/", { replace: true });
     }
+  }, [navigate]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function completeGoogleLogin() {
+      try {
+        const result = await getRedirectResult(firebaseAuth);
+
+        if (!result || !isMounted) return;
+
+        setIsSubmitting(true);
+        const idToken = await result.user.getIdToken(true);
+        const response = await authApi.loginWithGoogle(idToken);
+        const data = response?.data?.data ?? response?.data;
+
+        if (data.requiresPasswordSetup) {
+          localStorage.removeItem("authToken");
+          localStorage.setItem("setupToken", data.token);
+          setForm((previous) => ({
+            ...previous,
+            email: data.user?.email || result.user.email || "",
+          }));
+          setMode("setup-password");
+          setMessage("");
+        } else {
+          localStorage.removeItem("setupToken");
+          localStorage.setItem("authToken", data.token);
+          navigate("/", { replace: true });
+        }
+      } catch (error) {
+        console.error("Google redirect login failed", error);
+      } finally {
+        if (isMounted) setIsSubmitting(false);
+      }
+    }
+
+    completeGoogleLogin();
+
+    return () => {
+      isMounted = false;
+    };
   }, [navigate]);
 
   const updateField = (event) => {
@@ -179,51 +221,9 @@ function AuthPage() {
   const handleGoogleLogin = async () => {
     try {
       setIsSubmitting(true);
-      const result = await signInWithPopup(firebaseAuth, googleProvider);
-      const idToken = await result.user.getIdToken(true);
-      const response = await authApi.loginWithGoogle(idToken);
-      const data = response?.data?.data ?? response?.data;
-
-      if (data.requiresPasswordSetup) {
-        localStorage.removeItem("authToken");
-        localStorage.setItem("setupToken", data.token);
-        setForm((previous) => ({
-          ...previous,
-          email: data.user?.email || result.user.email || "",
-        }));
-        setMode("setup-password");
-        setMessage();
-        // "Lần đầu đăng nhập Google, bạn cần tạo mật khẩu cho tài khoản.",
-      } else {
-        localStorage.removeItem("setupToken");
-        localStorage.setItem("authToken", data.token);
-        navigate("/", { replace: true });
-      }
+      await signInWithRedirect(firebaseAuth, googleProvider);
     } catch (error) {
-      const firebaseMessages = {
-        "auth/popup-closed-by-user": "Cửa sổ đăng nhập đã được đóng.",
-        "auth/popup-blocked":
-          "Trình duyệt đã chặn cửa sổ Google. Hãy cho phép popup rồi thử lại.",
-        "auth/cancelled-popup-request":
-          "Một yêu cầu đăng nhập Google khác đang được xử lý.",
-        "auth/unauthorized-domain": `Domain ${window.location.hostname} chưa được thêm vào Firebase Authorized domains.`,
-        "auth/operation-not-allowed":
-          "Google Sign-In chưa được bật trong Firebase Authentication.",
-        "auth/invalid-api-key":
-          "Firebase API key trên bản deploy không hợp lệ hoặc bị thiếu.",
-        "auth/network-request-failed":
-          "Không thể kết nối tới Firebase. Hãy kiểm tra mạng và cấu hình domain.",
-      };
-      const apiMessage = error?.response?.data?.message;
-      const message =
-        apiMessage ||
-        firebaseMessages[error?.code] ||
-        (error?.request && !error?.response
-          ? "Không thể kết nối tới máy chủ đăng nhập. Kiểm tra VITE_API_URL trên Vercel."
-          : error?.message || "Không thể đăng nhập bằng Google.");
-
-      setMessage(message);
-    } finally {
+      console.error("Could not start Google redirect login", error);
       setIsSubmitting(false);
     }
   };
