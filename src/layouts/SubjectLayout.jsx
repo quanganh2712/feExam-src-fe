@@ -6,11 +6,19 @@ import {
   Card,
   Col,
   Container,
+  Modal,
   Nav,
   Row,
 } from "react-bootstrap";
-import { Link, NavLink, Outlet, useParams } from "react-router-dom";
-import subjectsApi from "../services/subjectsApi";
+import {
+  Link,
+  NavLink,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
+import questionsApi from "../services/questionsApi";
 
 function getSubjectName(subject, fallback) {
   return (
@@ -23,8 +31,11 @@ function getSubjectName(subject, fallback) {
 }
 
 function SubjectLayout() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { subjectId } = useParams();
   const [subject, setSubject] = useState(null);
+  const [showExamConfirmation, setShowExamConfirmation] = useState(false);
 
   const fallbackSubjectLabel = useMemo(() => {
     if (!subjectId) {
@@ -44,12 +55,17 @@ function SubjectLayout() {
       }
 
       try {
-        const response = await subjectsApi.getSubjectById(subjectId);
+        const response = await questionsApi.getQuestions(subjectId);
         const payload = response?.data;
-        const nextSubject = payload?.data ?? payload?.subject ?? payload;
+        const questions = Array.isArray(payload)
+          ? payload
+          : payload?.data || payload?.items || payload?.questions || [];
+        const nextSubject = questions[0]?.subjectId;
 
         if (!ignore) {
-          setSubject(nextSubject && typeof nextSubject === "object" ? nextSubject : null);
+          setSubject(
+            nextSubject && typeof nextSubject === "object" ? nextSubject : null,
+          );
         }
       } catch {
         if (!ignore) {
@@ -66,6 +82,21 @@ function SubjectLayout() {
   }, [subjectId]);
 
   const subjectLabel = getSubjectName(subject, fallbackSubjectLabel);
+
+  const openExamConfirmation = (event) => {
+    event.preventDefault();
+
+    if (location.pathname.endsWith("/exam")) {
+      return;
+    }
+
+    setShowExamConfirmation(true);
+  };
+
+  const confirmExamStart = () => {
+    setShowExamConfirmation(false);
+    navigate("exam");
+  };
 
   const sections = [
     { to: "", label: "Tổng quan", end: true },
@@ -111,6 +142,7 @@ function SubjectLayout() {
                 to="exam"
                 variant="outline-dark"
                 className="fw-semibold"
+                onClick={openExamConfirmation}
               >
                 Vào thi thử
               </Button>
@@ -129,6 +161,9 @@ function SubjectLayout() {
                 to={section.to}
                 end={section.end}
                 className="px-3 py-2 fw-semibold"
+                onClick={
+                  section.to === "exam" ? openExamConfirmation : undefined
+                }
               >
                 {section.label}
               </Nav.Link>
@@ -136,6 +171,28 @@ function SubjectLayout() {
           </Nav>
         </Col>
       </Row>
+
+      <Modal
+        show={showExamConfirmation}
+        onHide={() => setShowExamConfirmation(false)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Xác nhận thi thử</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>Bạn có đồng ý thi thử không?</Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="outline-secondary"
+            onClick={() => setShowExamConfirmation(false)}
+          >
+            Không
+          </Button>
+          <Button variant="warning" onClick={confirmExamStart}>
+            Có, bắt đầu thi
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       <Outlet />
     </Container>

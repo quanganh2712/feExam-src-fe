@@ -19,20 +19,22 @@ function AppNavbar() {
         <Navbar.Toggle aria-controls="main-nav" />
         <Navbar.Collapse id="main-nav">
           <Nav className="ms-auto gap-lg-2">
-            <Nav.Link as={NavLink} to="/" end className="fw-semibold">
-              Trang chủ
-            </Nav.Link>
-            <Nav.Link as={NavLink} to="/history" className="fw-semibold">
-              Lịch sử
-            </Nav.Link>
             {isAuthenticated ? (
-              <Nav.Link
-                as="button"
-                onClick={handleLogout}
-                className="fw-semibold"
-              >
-                Đăng xuất
-              </Nav.Link>
+              <>
+                <Nav.Link as={NavLink} to="/" end className="fw-semibold">
+                  Trang chủ
+                </Nav.Link>
+                <Nav.Link as={NavLink} to="/history" className="fw-semibold">
+                  Lịch sử
+                </Nav.Link>
+                <Nav.Link
+                  as="button"
+                  onClick={handleLogout}
+                  className="fw-semibold"
+                >
+                  Đăng xuất
+                </Nav.Link>
+              </>
             ) : (
               <Nav.Link as={NavLink} to="/login" className="fw-semibold">
                 Đăng nhập

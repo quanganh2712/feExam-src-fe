@@ -12,7 +12,26 @@ import ExamReviewPage from "../pages/ExamReviewPage";
 import AuthPage from "../pages/AuthPage";
 
 function RequireAuth({ children }) {
-  return localStorage.getItem("authToken") ? (
+  const token = localStorage.getItem("authToken");
+  let hasValidToken = Boolean(token);
+  let requiresPasswordSetup = false;
+
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      requiresPasswordSetup = payload.requiresPasswordSetup === true;
+    } catch {
+      localStorage.removeItem("authToken");
+      hasValidToken = false;
+    }
+  }
+
+  if (requiresPasswordSetup) {
+    localStorage.setItem("setupToken", token);
+    localStorage.removeItem("authToken");
+  }
+
+  return hasValidToken && !requiresPasswordSetup ? (
     children
   ) : (
     <Navigate to="/login" replace />
@@ -22,6 +41,14 @@ function RequireAuth({ children }) {
 function AppRoutes() {
   return (
     <Routes>
+      <Route
+        path="/subjects/:subjectId/exam"
+        element={
+          <RequireAuth>
+            <ExamPage />
+          </RequireAuth>
+        }
+      />
       <Route element={<MainLayout />}>
         <Route path="/login" element={<AuthPage />} />
         <Route
@@ -33,7 +60,6 @@ function AppRoutes() {
                 <Route path="/subjects/:subjectId" element={<SubjectLayout />}>
                   <Route index element={<SubjectOverviewPage />} />
                   <Route path="practice" element={<PracticePage />} />
-                  <Route path="exam" element={<ExamPage />} />
                   <Route path="wrong-answers" element={<WrongAnswersPage />} />
                 </Route>
                 <Route path="/history" element={<HistoryPage />} />

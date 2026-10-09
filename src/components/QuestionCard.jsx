@@ -31,6 +31,7 @@ function QuestionCard({
   selectedOptionId,
   onSelectOption,
   showAnswerKey = false,
+  showWrongAnswer = false,
   locked = false,
   compact = false,
   showQuestionNumber = true,
@@ -76,7 +77,7 @@ function QuestionCard({
                 showAnswerKey &&
                 normalizeOptionId(correctOptionId) === normalizedOptionId;
               const isWrong =
-                showAnswerKey &&
+                (showAnswerKey || showWrongAnswer) &&
                 isSelected &&
                 correctOptionId !== undefined &&
                 correctOptionId !== null &&

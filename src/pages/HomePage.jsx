@@ -1,30 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Badge, Col, Row, Spinner } from "react-bootstrap";
 import SubjectCard from "../components/SubjectCard";
 import subjectsApi from "../services/subjectsApi";
-
-const fallbackSubjects = [
-  {
-    id: "MLN1",
-    name: "MLN1",
-    description: "Môn học mẫu cho dữ liệu từ Backend.",
-  },
-  {
-    id: "MLN2",
-    name: "MLN2",
-    description: "Môn học mẫu cho dữ liệu từ Backend.",
-  },
-  {
-    id: "Triet-hoc",
-    name: "Triết học",
-    description: "Hiển thị như một môn độc lập, không hard-code vào luồng.",
-  },
-  {
-    id: "Phap-luat",
-    name: "Pháp luật",
-    description: "Môn học khác với cùng cấu trúc thi và ôn tập.",
-  },
-];
 
 function HomePage() {
   const [subjects, setSubjects] = useState([]);
@@ -34,9 +11,11 @@ function HomePage() {
   useEffect(() => {
     let ignore = false;
 
-    async function loadSubjects() {
+    async function loadSubjects(showLoading = true) {
       try {
-        setLoading(true);
+        if (showLoading) {
+          setLoading(true);
+        }
         setError("");
         const response = await subjectsApi.getSubjects();
         const payload = response?.data;
@@ -56,18 +35,18 @@ function HomePage() {
         })();
 
         if (!ignore) {
-          setSubjects(nextSubjects.length ? nextSubjects : fallbackSubjects);
+          setSubjects(nextSubjects);
         }
       } catch (err) {
         if (!ignore) {
           setError(
             err?.response?.data?.message ||
-              "Không thể tải danh sách môn học từ backend. Đang hiển thị dữ liệu mẫu.",
+              "Không thể tải danh sách môn học từ backend.",
           );
-          setSubjects(fallbackSubjects);
+          setSubjects([]);
         }
       } finally {
-        if (!ignore) {
+        if (!ignore && showLoading) {
           setLoading(false);
         }
       }
@@ -75,17 +54,21 @@ function HomePage() {
 
     loadSubjects();
 
+    const refreshSubjects = () => {
+      if (document.visibilityState === "visible") {
+        loadSubjects(false);
+      }
+    };
+
+    const refreshInterval = window.setInterval(refreshSubjects, 5000);
+    document.addEventListener("visibilitychange", refreshSubjects);
+
     return () => {
       ignore = true;
+      window.clearInterval(refreshInterval);
+      document.removeEventListener("visibilitychange", refreshSubjects);
     };
   }, []);
-
-  const visibleSubjects = useMemo(() => {
-    if (subjects.length) {
-      return subjects;
-    }
-    return fallbackSubjects;
-  }, [subjects]);
 
   return (
     <div className="d-grid gap-4 gap-lg-5">
@@ -120,8 +103,14 @@ function HomePage() {
           </Alert>
         ) : null}
 
+        {!loading && !error && subjects.length === 0 ? (
+          <Alert variant="info" className="mb-3">
+            Chưa có môn học nào trong hệ thống.
+          </Alert>
+        ) : null}
+
         <Row className="g-3 g-lg-4">
-          {visibleSubjects.map((subject, index) => {
+          {subjects.map((subject, index) => {
             const subjectKey =
               subject?.id ??
               subject?.subjectId ??

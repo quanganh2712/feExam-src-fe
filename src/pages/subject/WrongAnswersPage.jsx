@@ -1,51 +1,39 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, Card, Col, Row, Spinner } from "react-bootstrap";
-import { Link, useParams } from "react-router-dom";
+import { Alert, Col, Row, Spinner } from "react-bootstrap";
+import { useParams } from "react-router-dom";
 import EmptyState from "../../components/EmptyState";
 import QuestionCard from "../../components/QuestionCard";
 import examsApi from "../../services/examsApi";
-import subjectsApi from "../../services/subjectsApi";
+
+function getQuestionId(question) {
+  const questionId = question?.questionId;
+
+  return questionId?._id ?? questionId?.id ?? questionId ?? null;
+}
+
+function getUniqueQuestionKey(question) {
+  const questionId = getQuestionId(question);
+
+  if (questionId != null) {
+    return `id:${String(questionId)}`;
+  }
+
+  const questionText = String(question?.question ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+
+  return questionText ? `text:${questionText}` : null;
+}
 
 function WrongAnswersPage() {
   const { subjectId } = useParams();
-  const [subjectName, setSubjectName] = useState("");
   const [wrongAnswers, setWrongAnswers] = useState([]);
   const [answers, setAnswers] = useState({});
   const [checkedAnswers, setCheckedAnswers] = useState({});
   const [checkingQuestionId, setCheckingQuestionId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    let ignore = false;
-
-    async function loadSubject() {
-      if (!subjectId) return;
-
-      try {
-        const response = await subjectsApi.getSubjectById(subjectId);
-        const payload = response?.data;
-        const subject = payload?.data ?? payload?.subject ?? payload;
-        const name =
-          subject?.name ??
-          subject?.title ??
-          subject?.subjectName ??
-          subject?.displayName;
-
-        if (!ignore && name) {
-          setSubjectName(name);
-        }
-      } catch {
-        return;
-      }
-    }
-
-    loadSubject();
-
-    return () => {
-      ignore = true;
-    };
-  }, [subjectId]);
 
   useEffect(() => {
     let ignore = false;
@@ -59,11 +47,17 @@ function WrongAnswersPage() {
         const items = Array.isArray(payload)
           ? payload
           : (payload?.data ?? payload?.items ?? []);
-        const uniqueQuestions = Array.from(
-          new Map(
-            items.map((item) => [String(item.questionId), item]),
-          ).values(),
-        );
+        const uniqueQuestions = [];
+        const seenQuestionKeys = new Set();
+
+        items.forEach((item) => {
+          const questionKey = getUniqueQuestionKey(item);
+
+          if (questionKey && !seenQuestionKeys.has(questionKey)) {
+            seenQuestionKeys.add(questionKey);
+            uniqueQuestions.push(item);
+          }
+        });
 
         if (!ignore) {
           setWrongAnswers(uniqueQuestions);
@@ -89,26 +83,28 @@ function WrongAnswersPage() {
     };
   }, [subjectId]);
 
-  const displaySubjectName =
-    subjectName || (subjectId ? decodeURIComponent(subjectId) : "đang chọn");
-
-  const handleCheck = async (question) => {
-    const questionKey = String(question.questionId);
-    const selectedAnswer = String(answers[questionKey] ?? "").trim();
+  const handleSelectAnswer = async (question, optionId) => {
+    const questionId = getQuestionId(question);
+    const questionKey = String(questionId);
+    const selectedAnswer = String(optionId ?? "").trim();
     const correctAnswer = String(question.correctAnswer ?? "").trim();
 
+    setAnswers((previous) => ({
+      ...previous,
+      [questionKey]: optionId,
+    }));
     setCheckedAnswers((previous) => ({
       ...previous,
       [questionKey]: true,
     }));
 
-    if (selectedAnswer !== correctAnswer) return;
-
     try {
       setCheckingQuestionId(questionKey);
+      if (selectedAnswer !== correctAnswer) return;
+
       await examsApi.removeWrongAnswer(questionKey);
       setWrongAnswers((previous) =>
-        previous.filter((item) => String(item.questionId) !== questionKey),
+        previous.filter((item) => String(getQuestionId(item)) !== questionKey),
       );
       setAnswers((previous) => {
         const next = { ...previous };
@@ -132,7 +128,7 @@ function WrongAnswersPage() {
 
   return (
     <Row className="g-3 g-lg-4">
-      <Col xs={12} lg={8}>
+      <Col xs={12}>
         {loading ? (
           <div className="d-flex align-items-center gap-2 text-secondary">
             <Spinner animation="border" size="sm" />
@@ -149,12 +145,12 @@ function WrongAnswersPage() {
         {!loading && !error && wrongAnswers.length ? (
           <div className="d-grid gap-3">
             {wrongAnswers.map((question) => {
-              const questionKey = String(question.questionId);
+              const questionKey = String(getQuestionId(question));
               const isChecked = checkedAnswers[questionKey];
 
               return (
                 <div className="soft-card border-0" key={questionKey}>
-                  <div className="p-3 p-lg-4">
+                  <div className="p-4 p-lg-5">
                     <QuestionCard
                       question={{
                         ...question,
@@ -165,71 +161,23 @@ function WrongAnswersPage() {
                       }}
                       selectedOptionId={answers[questionKey]}
                       onSelectOption={(optionId) =>
-                        setAnswers((previous) => ({
-                          ...previous,
-                          [questionKey]: optionId,
-                        }))
+                        handleSelectAnswer(question, optionId)
                       }
                       showAnswerKey={isChecked}
+                      showWrongAnswer={isChecked}
                       showQuestionNumber={false}
                     />
-                    <div className="d-flex align-items-center gap-2 mt-3">
-                      <Button
-                        variant="warning"
-                        onClick={() => handleCheck(question)}
-                        disabled={
-                          !answers[questionKey] ||
-                          checkingQuestionId === questionKey
-                        }
-                      >
-                        {checkingQuestionId === questionKey
-                          ? "Đang cập nhật..."
-                          : "Kiểm tra đáp án"}
-                      </Button>
-                      {isChecked ? (
-                        <span
-                          className={
-                            answers[questionKey] === question.correctAnswer
-                              ? "text-success fw-semibold"
-                              : "text-danger fw-semibold"
-                          }
-                        >
-                          {answers[questionKey] === question.correctAnswer
-                            ? "Đúng"
-                            : "Chưa đúng"}
-                        </span>
-                      ) : null}
-                    </div>
+                    {isChecked && checkingQuestionId !== questionKey ? (
+                      <div className="text-secondary small mt-3">
+                        Đáp án đúng đã được đánh dấu.
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               );
             })}
           </div>
         ) : null}
-      </Col>
-
-      <Col xs={12} lg={4}>
-        <Card className="soft-card border-0">
-          <Card.Body className="p-4">
-            <div className="fw-semibold mb-2">Luyện lại theo môn</div>
-            <p className="text-secondary mb-3">
-              Dùng đúng dữ liệu sai của môn {displaySubjectName}.
-            </p>
-            <Button
-              as={Link}
-              to={`/subjects/${subjectId ?? ""}/practice`}
-              variant="warning"
-              className="fw-semibold"
-            >
-              Vào ôn tập
-            </Button>
-          </Card.Body>
-        </Card>
-
-        <Alert variant="info" className="mt-3 mb-0">
-          Trang này chỉ dành cho câu người dùng thực sự làm sai. Không có chức
-          năng câu trọng tâm hay câu hay thi.
-        </Alert>
       </Col>
     </Row>
   );

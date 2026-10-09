@@ -77,17 +77,27 @@ function HistoryPage() {
       {rows.length > 0 ? (
         <Card className="soft-card border-0">
           <Card.Body className="p-0">
-            <Table responsive hover className="mb-0 align-middle">
+            <Table responsive hover className="history-table mb-0 align-middle">
+              <colgroup>
+                <col className="history-col-subject" />
+                <col className="history-col-total" />
+                <col className="history-col-score" />
+                <col className="history-col-count" />
+                <col className="history-col-count" />
+                <col className="history-col-duration" />
+                <col className="history-col-date" />
+                <col className="history-col-action" />
+              </colgroup>
               <thead className="table-light">
                 <tr>
                   <th>Môn học</th>
-                  <th>Số câu</th>
-                  <th>Điểm</th>
-                  <th>Đúng</th>
-                  <th>Sai</th>
-                  <th>Thời gian</th>
-                  <th>Ngày làm bài</th>
-                  <th></th>
+                  <th className="text-center">Số câu</th>
+                  <th className="text-center">Điểm</th>
+                  <th className="text-center">Đúng</th>
+                  <th className="text-center">Sai</th>
+                  <th className="text-center">Thời gian</th>
+                  <th className="text-center">Ngày làm bài</th>
+                  <th className="text-center">Chi tiết</th>
                 </tr>
               </thead>
               <tbody>
@@ -136,21 +146,19 @@ function HistoryPage() {
                           Lần thi {attemptNumber}
                         </div>
                       </td>
-                      <td>{totalQuestions}</td>
-                      <td>{score}</td>
-                      <td>{correctCount}</td>
-                      <td>{wrongCount}</td>
-                      <td>{duration}</td>
-                      <td>{takenAt ? formatDateTime(takenAt) : "-"}</td>
-                      <td className="text-end">
+                      <td className="text-center">{totalQuestions}</td>
+                      <td className="text-center fw-semibold">{score}</td>
+                      <td className="text-center text-success">
+                        {correctCount}
+                      </td>
+                      <td className="text-center text-danger">{wrongCount}</td>
+                      <td className="text-center text-nowrap">{duration}</td>
+                      <td className="text-center text-nowrap">
+                        {takenAt ? formatDateTime(takenAt) : "-"}
+                      </td>
+                      <td className="text-center">
                         <Link
-                          className="btn btn-sm btn-outline-dark me-2"
-                          to={`/exams/${examId}/result`}
-                        >
-                          Kết quả
-                        </Link>
-                        <Link
-                          className="btn btn-sm btn-warning"
+                          className="btn btn-sm btn-warning text-nowrap"
                           to={`/exams/${examId}/review`}
                         >
                           Review

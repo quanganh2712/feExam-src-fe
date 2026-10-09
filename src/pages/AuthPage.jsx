@@ -6,21 +6,44 @@ import {
   Col,
   Container,
   Form,
+  OverlayTrigger,
   Row,
+  Tooltip,
 } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import authApi from "../services/authApi";
 import { firebaseAuth, googleProvider } from "../services/firebase";
 import { signInWithPopup } from "firebase/auth";
 
+function RegistrationHint({ id, children }) {
+  return (
+    <OverlayTrigger
+      placement="right"
+      trigger={["hover", "focus"]}
+      overlay={<Tooltip id={id}>{children}</Tooltip>}
+    >
+      <button
+        type="button"
+        className="auth-info-button"
+        aria-label="Xem hướng dẫn nhập"
+      >
+        i
+      </button>
+    </OverlayTrigger>
+  );
+}
+
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState("login");
+  const [mode, setMode] = useState(() =>
+    localStorage.getItem("setupToken") ? "setup-password" : "login",
+  );
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
+    otp: "",
   });
   const [message, setMessage] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -35,6 +58,11 @@ function AuthPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isRegister = mode === "register";
+  const isForgotPassword = mode === "forgot";
+  const isResetPassword = mode === "reset";
+  const isPasswordSetup = mode === "setup-password";
+  const isPasswordResetFlow =
+    isForgotPassword || isResetPassword || isPasswordSetup;
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has("token")) {
@@ -59,22 +87,66 @@ function AuthPage() {
       return;
     }
 
+    if (isResetPassword && form.password !== form.confirmPassword) {
+      setFieldErrors({});
+      setMessage("Mật khẩu xác nhận chưa khớp.");
+      return;
+    }
+
+    if (isPasswordSetup && form.password !== form.confirmPassword) {
+      setFieldErrors({});
+      setMessage("Mật khẩu xác nhận chưa khớp.");
+      return;
+    }
+
     async function submitAuth() {
       try {
         setIsSubmitting(true);
-        const response = isRegister
-          ? await authApi.register({
-              name: form.name,
-              email: form.email,
-              password: form.password,
-            })
-          : await authApi.login({
-              email: form.email,
-              password: form.password,
-            });
+        let response;
+        if (isPasswordSetup) {
+          response = await authApi.setPassword(form.password);
+        } else if (isForgotPassword) {
+          response = await authApi.requestPasswordReset(form.email);
+        } else if (isResetPassword) {
+          response = await authApi.resetPassword({
+            email: form.email,
+            otp: form.otp,
+            password: form.password,
+          });
+        } else {
+          response = isRegister
+            ? await authApi.register({
+                name: form.name,
+                email: form.email,
+                password: form.password,
+              })
+            : await authApi.login({
+                email: form.email,
+                password: form.password,
+              });
+        }
         const data = response?.data?.data ?? response?.data;
 
-        if (isRegister) {
+        if (isPasswordSetup) {
+          const setupData = response?.data?.data ?? response?.data;
+          localStorage.removeItem("setupToken");
+          localStorage.setItem("authToken", setupData.token);
+          navigate("/", { replace: true });
+        } else if (isForgotPassword) {
+          setMode("reset");
+          setMessage(
+            "Nếu email tồn tại, mã OTP đã được gửi. Hãy kiểm tra hộp thư.",
+          );
+        } else if (isResetPassword) {
+          setMode("login");
+          setForm((previous) => ({
+            ...previous,
+            password: "",
+            confirmPassword: "",
+            otp: "",
+          }));
+          setMessage("Đặt lại mật khẩu thành công. Vui lòng đăng nhập.");
+        } else if (isRegister) {
           localStorage.removeItem("authToken");
           setMode("login");
           setFieldErrors({});
@@ -112,8 +184,21 @@ function AuthPage() {
       const response = await authApi.loginWithGoogle(idToken);
       const data = response?.data?.data ?? response?.data;
 
-      localStorage.setItem("authToken", data.token);
-      navigate("/", { replace: true });
+      if (data.requiresPasswordSetup) {
+        localStorage.removeItem("authToken");
+        localStorage.setItem("setupToken", data.token);
+        setForm((previous) => ({
+          ...previous,
+          email: data.user?.email || result.user.email || "",
+        }));
+        setMode("setup-password");
+        setMessage();
+        // "Lần đầu đăng nhập Google, bạn cần tạo mật khẩu cho tài khoản.",
+      } else {
+        localStorage.removeItem("setupToken");
+        localStorage.setItem("authToken", data.token);
+        navigate("/", { replace: true });
+      }
     } catch (error) {
       setMessage(
         error?.response?.data?.message ||
@@ -130,6 +215,12 @@ function AuthPage() {
     setMode(nextMode);
     setFieldErrors({});
     setMessage("");
+    setForm((previous) => ({
+      ...previous,
+      password: "",
+      confirmPassword: "",
+      otp: "",
+    }));
   };
 
   return (
@@ -150,31 +241,47 @@ function AuthPage() {
           <Col xs={12} md={8} lg={6} xl={5}>
             <Card className="auth-card border-0">
               <Card.Body className="p-4 p-lg-5">
-                <div className="d-flex gap-1 auth-tabs mb-4" role="tablist">
-                  <button
-                    type="button"
-                    className={`auth-tab ${!isRegister ? "is-active" : ""}`}
-                    onClick={() => switchMode("login")}
-                  >
-                    Đăng nhập
-                  </button>
-                  <button
-                    type="button"
-                    className={`auth-tab ${isRegister ? "is-active" : ""}`}
-                    onClick={() => switchMode("register")}
-                  >
-                    Đăng ký
-                  </button>
-                </div>
+                {!isPasswordResetFlow ? (
+                  <div className="d-flex gap-1 auth-tabs mb-4" role="tablist">
+                    <button
+                      type="button"
+                      className={`auth-tab ${!isRegister ? "is-active" : ""}`}
+                      onClick={() => switchMode("login")}
+                    >
+                      Đăng nhập
+                    </button>
+                    <button
+                      type="button"
+                      className={`auth-tab ${isRegister ? "is-active" : ""}`}
+                      onClick={() => switchMode("register")}
+                    >
+                      Đăng ký
+                    </button>
+                  </div>
+                ) : null}
 
                 <div className="mb-4">
                   <h2 className="h3 mb-2">
-                    {isRegister ? "Tạo tài khoản mới" : "Chào mừng trở lại"}
+                    {isPasswordSetup
+                      ? "Tạo mật khẩu cho tài khoản"
+                      : isForgotPassword
+                        ? "Quên mật khẩu?"
+                        : isResetPassword
+                          ? "Đặt lại mật khẩu"
+                          : isRegister
+                            ? "Tạo tài khoản mới"
+                            : "Chào mừng trở lại"}
                   </h2>
                   <p className="text-secondary mb-0">
-                    {isRegister
-                      ? "Bắt đầu lưu lại hành trình ôn thi của bạn."
-                      : "Đăng nhập để tiếp tục việc học của bạn."}
+                    {isPasswordSetup
+                      ? "Mật khẩu này sẽ dùng để đăng nhập bằng email về sau."
+                      : isForgotPassword
+                        ? "Nhập email để nhận mã OTP đặt lại mật khẩu."
+                        : isResetPassword
+                          ? "Nhập mã OTP trong email và mật khẩu mới của bạn."
+                          : isRegister
+                            ? "Bắt đầu lưu lại hành trình ôn thi của bạn."
+                            : "Đăng nhập để tiếp tục việc học của bạn."}
                   </p>
                 </div>
 
@@ -183,12 +290,16 @@ function AuthPage() {
                 <Form onSubmit={handleSubmit}>
                   {isRegister ? (
                     <Form.Group className="mb-3" controlId="auth-name">
-                      <Form.Label>Họ và tên</Form.Label>
+                      <div className="auth-label-with-hint">
+                        <Form.Label>Họ và tên</Form.Label>
+                        <RegistrationHint id="name-hint">
+                          Nhập họ và tên của bạn. Tên không được để trống.
+                        </RegistrationHint>
+                      </div>
                       <Form.Control
                         name="name"
                         value={form.name}
                         onChange={updateField}
-                        placeholder="Nguyễn Văn A"
                         isInvalid={Boolean(fieldErrors.name)}
                         required
                       />
@@ -199,14 +310,19 @@ function AuthPage() {
                   ) : null}
 
                   <Form.Group className="mb-3" controlId="auth-email">
-                    <Form.Label>Email</Form.Label>
+                    <div className="auth-label-with-hint">
+                      <Form.Label>Email</Form.Label>
+                      <RegistrationHint id="email-hint">
+                        Nhập email hợp lệ của tài khoản.
+                      </RegistrationHint>
+                    </div>
                     <Form.Control
                       type="email"
                       name="email"
                       value={form.email}
                       onChange={updateField}
-                      placeholder="ban@example.com"
                       isInvalid={Boolean(fieldErrors.email)}
+                      disabled={isResetPassword || isPasswordSetup}
                       required
                     />
                     <Form.Control.Feedback type="invalid" className="small">
@@ -214,38 +330,107 @@ function AuthPage() {
                     </Form.Control.Feedback>
                   </Form.Group>
 
-                  <Form.Group className="mb-3" controlId="auth-password">
-                    <div className="d-flex justify-content-between">
-                      <Form.Label>Mật khẩu</Form.Label>
-                      {!isRegister ? (
-                        <button type="button" className="auth-link">
-                          Quên mật khẩu?
-                        </button>
-                      ) : null}
-                    </div>
-                    <Form.Control
-                      type="password"
-                      name="password"
-                      value={form.password}
-                      onChange={updateField}
-                      placeholder="Tối thiểu 6 ký tự"
-                      minLength={6}
-                      required
-                    />
-                  </Form.Group>
+                  {!isForgotPassword && !isResetPassword && !isPasswordSetup ? (
+                    <Form.Group className="mb-3" controlId="auth-password">
+                      <div className="d-flex justify-content-between">
+                        <div className="auth-label-with-hint">
+                          <Form.Label>Mật khẩu</Form.Label>
+                          <RegistrationHint id="password-hint">
+                            {isRegister
+                              ? "Mật khẩu phải có ít nhất 6 ký tự."
+                              : "Nhập mật khẩu của tài khoản của bạn."}
+                          </RegistrationHint>
+                        </div>
+                        {!isRegister ? (
+                          <button
+                            type="button"
+                            className="auth-link"
+                            onClick={() => switchMode("forgot")}
+                          >
+                            Quên mật khẩu?
+                          </button>
+                        ) : null}
+                      </div>
+                      {isRegister ? (
+                        <Form.Control
+                          type="password"
+                          name="password"
+                          value={form.password}
+                          onChange={updateField}
+                          minLength={6}
+                          required
+                        />
+                      ) : (
+                        <Form.Control
+                          type="password"
+                          name="password"
+                          value={form.password}
+                          onChange={updateField}
+                          minLength={6}
+                          required
+                        />
+                      )}
+                    </Form.Group>
+                  ) : null}
 
-                  {isRegister ? (
+                  {isResetPassword || isPasswordSetup ? (
+                    <>
+                      {isResetPassword ? (
+                        <Form.Group className="mb-3" controlId="auth-otp">
+                          <Form.Label>Mã OTP</Form.Label>
+                          <Form.Control
+                            inputMode="numeric"
+                            name="otp"
+                            value={form.otp}
+                            onChange={updateField}
+                            maxLength={6}
+                            isInvalid={Boolean(fieldErrors.otp)}
+                            required
+                          />
+                          <Form.Control.Feedback type="invalid">
+                            {fieldErrors.otp}
+                          </Form.Control.Feedback>
+                        </Form.Group>
+                      ) : null}
+                      <Form.Group
+                        className="mb-3"
+                        controlId={
+                          isPasswordSetup
+                            ? "auth-setup-password"
+                            : "auth-new-password"
+                        }
+                      >
+                        <Form.Label>
+                          {isPasswordSetup ? "Mật khẩu" : "Mật khẩu mới"}
+                        </Form.Label>
+                        <Form.Control
+                          type="password"
+                          name="password"
+                          value={form.password}
+                          onChange={updateField}
+                          minLength={6}
+                          required
+                        />
+                      </Form.Group>
+                    </>
+                  ) : null}
+
+                  {isRegister || isResetPassword || isPasswordSetup ? (
                     <Form.Group
                       className="mb-3"
                       controlId="auth-confirm-password"
                     >
-                      <Form.Label>Nhập lại mật khẩu</Form.Label>
+                      <div className="auth-label-with-hint">
+                        <Form.Label>Nhập lại mật khẩu</Form.Label>
+                        <RegistrationHint id="confirm-password-hint">
+                          Nhập lại đúng mật khẩu ở trên.
+                        </RegistrationHint>
+                      </div>
                       <Form.Control
                         type="password"
                         name="confirmPassword"
                         value={form.confirmPassword}
                         onChange={updateField}
-                        placeholder="Nhập lại mật khẩu"
                         minLength={6}
                         required
                       />
@@ -255,44 +440,60 @@ function AuthPage() {
                   <Button
                     type="submit"
                     variant="dark"
-                    className="w-100 py-2 fw-semibold"
+                    className="auth-submit-button w-100 py-2 fw-semibold"
                     disabled={isSubmitting}
                   >
                     {isSubmitting
                       ? "Đang xử lý..."
-                      : isRegister
-                        ? "Tạo tài khoản"
-                        : "Đăng nhập"}
+                      : isPasswordSetup
+                        ? "Lưu mật khẩu"
+                        : isForgotPassword
+                          ? "Gửi mã OTP"
+                          : isResetPassword
+                            ? "Đặt lại mật khẩu"
+                            : isRegister
+                              ? "Tạo tài khoản"
+                              : "Đăng nhập"}
                   </Button>
                 </Form>
 
-                <div className="auth-divider">
-                  <span>hoặc tiếp tục với</span>
-                </div>
+                {!isPasswordResetFlow ? (
+                  <div className="auth-divider">
+                    <span>hoặc tiếp tục với</span>
+                  </div>
+                ) : null}
 
-                <Button
-                  type="button"
-                  variant="outline-dark"
-                  className="google-button w-100 py-2"
-                  onClick={handleGoogleLogin}
-                  disabled={isSubmitting}
-                >
-                  <span className="google-mark" aria-hidden="true">
-                    G
-                  </span>
-                  Google
-                </Button>
+                {!isPasswordResetFlow ? (
+                  <Button
+                    type="button"
+                    variant="outline-dark"
+                    className="google-button auth-google-button w-100 py-2"
+                    onClick={handleGoogleLogin}
+                    disabled={isSubmitting}
+                  >
+                    <span className="google-mark" aria-hidden="true">
+                      G
+                    </span>
+                    Google
+                  </Button>
+                ) : null}
 
                 <p className="text-center text-secondary small mt-4 mb-0">
-                  {isRegister ? "Đã có tài khoản?" : "Chưa có tài khoản?"}{" "}
+                  {isPasswordResetFlow
+                    ? "Nhớ mật khẩu rồi?"
+                    : isRegister
+                      ? "Đã có tài khoản?"
+                      : "Chưa có tài khoản?"}{" "}
                   <button
                     type="button"
                     className="auth-link fw-semibold"
-                    onClick={() =>
-                      switchMode(isRegister ? "login" : "register")
-                    }
+                    onClick={() => switchMode("login")}
                   >
-                    {isRegister ? "Đăng nhập" : "Đăng ký ngay"}
+                    {isPasswordResetFlow
+                      ? "Đăng nhập"
+                      : isRegister
+                        ? "Đăng nhập"
+                        : "Đăng ký ngay"}
                   </button>
                 </p>
               </Card.Body>
